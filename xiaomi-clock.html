@@ -1,0 +1,2409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>小米电视待机时钟屏保</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+
+        /* 背景粒子效果 */
+        .background-particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .particle {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: floatParticle 20s linear infinite;
+        }
+
+        @keyframes floatParticle {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* 主容器 */
+        .screensaver-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            z-index: 10;
+            position: relative;
+        }
+
+        /* 时钟容器 */
+        .clock-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* 为发光效果预留空间 */
+            padding: 40px;
+        }
+
+        /* 圆形时钟 */
+        .circular-clock {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 
+                0 0 40px rgba(255, 255, 255, 0.05),
+                inset 0 0 40px rgba(255, 255, 255, 0.02);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            /* 确保发光效果不被裁剪 */
+            overflow: visible;
+        }
+
+        /* 时钟刻度 - 隐藏以实现简约设计 */
+        .clock-marks {
+            display: none;
+        }
+
+        /* 表盘右侧发光弧（随时间移动） - 方案二：外发光增强 */
+        .glow-arc {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2; /* 在指针之下，中心点之下 */
+            overflow: visible;
+            mix-blend-mode: screen; /* 与背景叠加更自然的流光 */
+            transform-origin: center center; /* 确保从中心点旋转 */
+            
+            /* CSS硬件加速优化（修复渲染边界问题） */
+            will-change: transform, filter;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+            /* 移除 contain 属性，避免切割效果 */
+            
+            /* 方案二：外发光光晕效果 */
+            filter: 
+                drop-shadow(0 0 2px rgba(255,255,255,1))
+                drop-shadow(0 0 4px rgba(255,255,255,0.8))
+                drop-shadow(0 0 8px rgba(135,206,250,0.6))
+                drop-shadow(0 0 16px rgba(135,206,250,0.4))
+                drop-shadow(0 0 24px rgba(173,216,230,0.3))
+                drop-shadow(0 0 32px rgba(173,216,230,0.2));
+        }
+
+        /* 添加背景光晕效果 */
+        .glow-arc::before {
+            content: '';
+            position: absolute;
+            top: -30px; 
+            left: -30px; 
+            right: -30px; 
+            bottom: -30px;
+            background: radial-gradient(circle, 
+                rgba(135,206,250,0.12) 0%, 
+                rgba(135,206,250,0.08) 40%,
+                rgba(173,216,230,0.05) 70%,
+                transparent 100%
+            );
+            border-radius: 50%;
+            pointer-events: none;
+            animation: pulseGlow 4s ease-in-out infinite alternate;
+            z-index: -1;
+        }
+
+        @keyframes pulseGlow {
+            0% { 
+                opacity: 0.4; 
+                transform: scale(0.95);
+            }
+            100% { 
+                opacity: 0.8; 
+                transform: scale(1.08);
+            }
+        }
+
+        /* 粒子尾迹系统 */
+        .particle-trail-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+            z-index: 1; /* 在弧线之下 */
+            
+            /* CSS硬件加速优化（修复渲染边界问题） */
+            will-change: transform;
+            transform-style: preserve-3d;
+            /* 移除 contain 属性，避免粒子被切割 */
+        }
+
+        .trail-particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            background: radial-gradient(circle, 
+                rgba(255,255,255,0.6) 0%, 
+                rgba(135,206,250,0.4) 40%, 
+                rgba(173,216,230,0.2) 70%, 
+                transparent 100%
+            );
+            box-shadow: 0 0 3px rgba(255,255,255,0.3), 0 0 6px rgba(135,206,250,0.2);
+            
+            /* CSS硬件加速优化 */
+            will-change: transform, opacity;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+        }
+
+        .trail-particle.large {
+            width: 2.5px;
+            height: 2.5px;
+        }
+
+        .trail-particle.medium {
+            width: 2px;
+            height: 2px;
+            opacity: 0.7;
+        }
+
+        .trail-particle.small {
+            width: 1.5px;
+            height: 1.5px;
+            opacity: 0.5;
+        }
+
+        /* 时钟指针 */
+        .clock-hands {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 3;
+        }
+
+        .hand {
+            position: absolute;
+            border-radius: 10px;
+            transform-origin: center bottom;
+            left: 50%;
+            bottom: 50%;
+            
+            /* CSS硬件加速优化 */
+            will-change: transform;
+            transform-style: preserve-3d;
+            backface-visibility: hidden;
+        }
+
+        .hour-hand {
+            width: 4px;
+            height: 80px;
+            margin-left: -2px;
+            background: rgba(255, 255, 255, 0.85);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+        }
+
+        .minute-hand {
+            width: 2px;
+            height: 110px;
+            margin-left: -1px;
+            background: rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+        }
+
+        /* 秒针样式已移除 */
+
+        /* 时钟中心点 - 宇宙核心光源 */
+        .clock-center {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: radial-gradient(circle,
+                rgba(255, 255, 255, 1) 0%,
+                rgba(135, 206, 250, 0.9) 30%,
+                rgba(173, 216, 230, 0.6) 60%,
+                rgba(173, 216, 230, 0.2) 100%
+            );
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 
+                0 0 8px rgba(255, 255, 255, 1),
+                0 0 16px rgba(135, 206, 250, 0.8),
+                0 0 24px rgba(173, 216, 230, 0.6),
+                0 0 32px rgba(173, 216, 230, 0.3);
+            z-index: 10;
+            animation: corePulse 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes corePulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                box-shadow: 
+                    0 0 8px rgba(255, 255, 255, 1),
+                    0 0 16px rgba(135, 206, 250, 0.8),
+                    0 0 24px rgba(173, 216, 230, 0.6),
+                    0 0 32px rgba(173, 216, 230, 0.3);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.2);
+                box-shadow: 
+                    0 0 12px rgba(255, 255, 255, 1),
+                    0 0 24px rgba(135, 206, 250, 0.9),
+                    0 0 36px rgba(173, 216, 230, 0.7),
+                    0 0 48px rgba(173, 216, 230, 0.4);
+            }
+        }
+
+        /* 数字时间显示 */
+        .digital-time {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .time-display {
+            font-size: 3rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+
+        .date-display {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            letter-spacing: 1px;
+        }
+
+        /* 天气信息容器 */
+        .weather-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .weather-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+            min-width: 250px;
+        }
+
+        .weather-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            display: block;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
+        }
+
+        .temperature {
+            font-size: 3rem;
+            font-weight: 300;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+        }
+
+        .weather-desc {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .weather-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .weather-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .weather-item-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+
+        /* 城市信息 */
+        .city-info {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.1);
+        }
+
+        .city-name {
+            font-size: 1.3rem;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .city-time {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+
+
+
+        /* 设置按钮 */
+        .settings-btn {
+            position: fixed; /* 改为 fixed 确保不被其他元素遮挡 */
+            top: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.15); /* 增加背景透明度便于调试 */
+            border: 2px solid rgba(255, 255, 255, 0.3); /* 增加边框便于识别 */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            color: white;
+            font-size: 1.2rem;
+            z-index: 9999; /* 提高层级确保在最顶层 */
+            pointer-events: auto; /* 确保可以接收鼠标事件 */
+        }
+
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: rotate(90deg);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 1200px) {
+            .screensaver-container {
+                flex-direction: column;
+                gap: 40px;
+            }
+            
+            .circular-clock {
+                width: 250px;
+                height: 250px;
+            }
+            
+            .hour-hand { height: 65px; }
+            .minute-hand { height: 90px; }
+            /* .second-hand { height: 105px; } */
+            
+            .time-display {
+                font-size: 2.5rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .circular-clock {
+                width: 200px;
+                height: 200px;
+            }
+            
+            .hour-hand { height: 50px; }
+            .minute-hand { height: 70px; }
+            /* .second-hand { height: 85px; } */
+            
+            .time-display {
+                font-size: 2rem;
+            }
+            
+            .temperature {
+                font-size: 2.5rem;
+            }
+            
+            .weather-icon {
+                font-size: 3rem;
+            }
+        }
+
+        /* 加载动画 */
+        .loading {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+
+        /* 夜间模式 */
+        body.night-mode {
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+        }
+
+        body.night-mode .circular-clock,
+        body.night-mode .weather-card,
+        body.night-mode .city-info {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景粒子 -->
+    <div class="background-particles"></div>
+
+    <!-- 设置按钮 -->
+    <div class="settings-btn" id="settingsBtn">⚙️</div>
+
+    <!-- 主容器 -->
+    <div class="screensaver-container">
+        <!-- 时钟部分 -->
+        <div class="clock-container">
+            <!-- 圆形时钟 -->
+            <div class="circular-clock loading">
+                <!-- 时钟刻度 -->
+                <div class="clock-marks"></div>
+                
+                <!-- 表盘外壳右侧单线流光（外边缘） -->
+                <svg class="glow-arc" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+                    <defs>
+                        <!-- 线性渐变：优化配合外发光效果 -->
+                        <linearGradient id="edgeGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%"   stop-color="rgba(255,255,255,1)"/>
+                            <stop offset="12%"  stop-color="rgba(240,248,255,0.95)"/>
+                            <stop offset="25%"  stop-color="rgba(200,225,250,0.85)"/>
+                            <stop offset="50%"  stop-color="rgba(135,206,250,0.6)"/>
+                            <stop offset="75%"  stop-color="rgba(173,216,230,0.35)"/>
+                            <stop offset="90%"  stop-color="rgba(173,216,230,0.15)"/>
+                            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+                        </linearGradient>
+                        <!-- 轻微羽化配合外发光 -->
+                        <filter id="edgeFeather" x="-100%" y="-100%" width="300%" height="300%">
+                            <feGaussianBlur stdDeviation="0.25"/>
+                        </filter>
+                    </defs>
+                    <!-- 单条外侧弧线：完整外圈 + 半圈光段（dasharray 50/50），随旋转移动 -->
+                    <circle id="edgeArc" cx="50" cy="50" r="50.6" fill="none" stroke="url(#edgeGlow)" stroke-width="1.3" stroke-linecap="round" filter="url(#edgeFeather)" pathLength="100" stroke-dasharray="50 50" stroke-dashoffset="75"/>
+                </svg>
+                
+                <!-- 粒子尾迹容器 -->
+                <div class="particle-trail-container"></div>
+                
+                <!-- 时钟指针 -->
+                <div class="clock-hands">
+                    <div class="hand hour-hand"></div>
+                    <div class="hand minute-hand"></div>
+                    <!-- <div class="hand second-hand"></div> -->
+                </div>
+                
+                <!-- 时钟中心点 -->
+                <div class="clock-center"></div>
+            </div>
+
+            <!-- 数字时间显示 -->
+            <div class="digital-time loading">
+                <div class="time-display">00:00:00</div>
+                <div class="date-display">2024年1月1日 星期一</div>
+            </div>
+        </div>
+
+        <!-- 天气信息部分 -->
+        <div class="weather-container">
+            <!-- 天气卡片 -->
+            <div class="weather-card loading">
+                <span class="weather-icon">☀️</span>
+                <div class="temperature">--°</div>
+                <div class="weather-desc">获取天气中...</div>
+                <div class="weather-details">
+                    <div class="weather-item">
+                        <span>湿度</span>
+                        <div class="weather-item-value">--%</div>
+                    </div>
+                    <div class="weather-item">
+                        <span>风速</span>
+                        <div class="weather-item-value">-- km/h</div>
+                    </div>
+                    <div class="weather-item">
+                        <span>能见度</span>
+                        <div class="weather-item-value">-- km</div>
+                    </div>
+                    <div class="weather-item">
+                        <span>气压</span>
+                        <div class="weather-item-value">-- hPa</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 城市信息 -->
+            <div class="city-info loading">
+                <div class="city-name">北京市</div>
+                <div class="city-time">中国标准时间</div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <script>
+        class XiaomiTVClock {
+            constructor() {
+                this.isNightMode = false;
+                this.lastSecond = -1;
+                // this.secondHandRotation = 0; // 秒针相关变量已移除
+                this.particleSystem = null;
+                this.environmentMapping = null;
+                
+                // 性能优化：FPS控制和监控
+                this.performanceOptimization = {
+                    targetFPS: 30,
+                    frameTime: 1000 / 30, // ~33.33ms
+                    lastFrameTime: 0,
+                    frameCount: 0,
+                    lastFPSUpdate: 0,
+                    currentFPS: 0,
+                    
+                    // FPS限制器
+                    shouldRender(currentTime) {
+                        if (currentTime - this.lastFrameTime >= this.frameTime) {
+                            this.lastFrameTime = currentTime;
+                            this.frameCount++;
+                            
+                            // 每秒更新一次FPS统计
+                            if (currentTime - this.lastFPSUpdate >= 1000) {
+                                this.currentFPS = this.frameCount;
+                                this.frameCount = 0;
+                                this.lastFPSUpdate = currentTime;
+                                
+                                // 开发模式下显示FPS（可选）
+                                if (window.debugMode) {
+                                    console.log(`当前FPS: ${this.currentFPS}`);
+                                }
+                            }
+                            
+                            return true;
+                        }
+                        return false;
+                    }
+                };
+                
+                this.init();
+            }
+
+            init() {
+                this.createParticles();
+                this.startClock();
+                this.getWeatherData();
+                this.initAnimations();
+                this.bindEvents();
+                this.initParticleTrailSystem();
+                this.initEnvironmentMapping();
+                this.animateGlowArc();
+            }
+
+            // 创建背景粒子
+            createParticles() {
+                const container = document.querySelector('.background-particles');
+                
+                for (let i = 0; i < 20; i++) {
+                    const particle = document.createElement('div');
+                    particle.className = 'particle';
+                    particle.style.width = Math.random() * 4 + 2 + 'px';
+                    particle.style.height = particle.style.width;
+                    particle.style.left = Math.random() * 100 + '%';
+                    particle.style.animationDelay = Math.random() * 20 + 's';
+                    particle.style.animationDuration = (Math.random() * 10 + 15) + 's';
+                    container.appendChild(particle);
+                }
+            }
+
+
+
+            // 启动时钟
+            startClock() {
+                const updateClock = () => {
+                    const now = new Date();
+                    
+                    // 更新数字时间
+                    this.updateDigitalTime(now);
+                    
+                    // 更新指针位置
+                    this.updateClockHands(now);
+                };
+
+                updateClock();
+                // 性能优化：时钟更新保持1秒间隔，但确保精确性
+                setInterval(updateClock, 1000);
+            }
+
+            // 初始化粒子尾迹系统
+            initParticleTrailSystem() {
+                this.particleSystem = {
+                    particles: [],
+                    container: document.querySelector('.particle-trail-container'),
+                    isEnabled: true,
+                    maxParticles: 20,
+                    
+                    createParticle(x, y, size = 'small') {
+                        if (!this.container || this.particles.length >= this.maxParticles) return null;
+                        
+                        const particle = document.createElement('div');
+                        particle.className = `trail-particle ${size}`;
+                        particle.style.left = x + 'px';
+                        particle.style.top = y + 'px';
+                        particle.style.opacity = '1';
+                        
+                        const particleData = {
+                            element: particle,
+                            life: 1.2, // 粒子寿命
+                            maxLife: 1.2,
+                            x: x,
+                            y: y,
+                            vx: (Math.random() - 0.5) * 0.3,
+                            vy: (Math.random() - 0.5) * 0.3,
+                            size: size
+                        };
+                        
+                        this.container.appendChild(particle);
+                        this.particles.push(particleData);
+                        
+                        return particleData;
+                    },
+                    
+                    updateParticles() {
+                        if (!this.isEnabled) return;
+                        
+                        // 更新现有粒子
+                        for (let i = this.particles.length - 1; i >= 0; i--) {
+                            const particle = this.particles[i];
+                            
+                            // 更新位置
+                            particle.x += particle.vx;
+                            particle.y += particle.vy;
+                            particle.life -= 0.016; // 约60fps
+                            
+                            // 衰减速度
+                            particle.vx *= 0.99;
+                            particle.vy *= 0.99;
+                            
+                            // 更新透明度
+                            const alpha = Math.max(0, particle.life / particle.maxLife);
+                            particle.element.style.opacity = alpha * 0.6; // 降低整体透明度
+                            particle.element.style.left = particle.x + 'px';
+                            particle.element.style.top = particle.y + 'px';
+                            
+                            // 移除生命周期结束的粒子
+                            if (particle.life <= 0) {
+                                this.container.removeChild(particle.element);
+                                this.particles.splice(i, 1);
+                            }
+                        }
+                    }
+                };
+            }
+
+            // 初始化智能环境映射系统
+            initEnvironmentMapping() {
+                this.environmentMapping = {
+                    isEnabled: true,
+                    adaptationIntensity: 0.7,
+                    contrastBoost: 1.2,
+                    temperatureShift: 0,
+                    lastBackgroundColor: '',
+                    
+                    // 智能色彩温度系统
+                    colorTemperature: {
+                        enabled: true,
+                        timeBasedEnabled: true,
+                        environmentBasedEnabled: true,
+                        currentTemp: 6500, // 当前色温 (K)
+                        targetTemp: 6500,
+                        transitionSpeed: 0.02,
+                        
+                        // 时间-色温映射
+                        getTimeBasedTemperature() {
+                            const now = new Date();
+                            const hour = now.getHours();
+                            const minute = now.getMinutes();
+                            const timeInMinutes = hour * 60 + minute;
+                            
+                            // 色温变化曲线（模拟日光变化）
+                            if (timeInMinutes < 360) { // 0-6点：深夜
+                                return 2700; // 暖色温
+                            } else if (timeInMinutes < 480) { // 6-8点：日出
+                                return 3000 + (timeInMinutes - 360) * 8.33; // 3000-4000K
+                            } else if (timeInMinutes < 660) { // 8-11点：上午
+                                return 4000 + (timeInMinutes - 480) * 5.56; // 4000-5000K
+                            } else if (timeInMinutes < 900) { // 11-15点：正午
+                                return 5000 + (timeInMinutes - 660) * 6.25; // 5000-6500K
+                            } else if (timeInMinutes < 1080) { // 15-18点：下午
+                                return 6500 - (timeInMinutes - 900) * 2.78; // 6500-6000K
+                            } else if (timeInMinutes < 1200) { // 18-20点：黄昏
+                                return 6000 - (timeInMinutes - 1080) * 12.5; // 6000-4500K
+                            } else if (timeInMinutes < 1320) { // 20-22点：夜晚
+                                return 4500 - (timeInMinutes - 1200) * 10; // 4500-3300K
+                            } else { // 22-24点：深夜
+                                return 3300 - (timeInMinutes - 1320) * 5; // 3300-2700K
+                            }
+                        },
+                        
+                        // 环境色温检测
+                        getEnvironmentTemperature(bgColor) {
+                            const r = bgColor.r / 255;
+                            const g = bgColor.g / 255;
+                            const b = bgColor.b / 255;
+                            
+                            // 基于RGB计算色温
+                            const rg_ratio = r / (g + 0.01);
+                            const gb_ratio = g / (b + 0.01);
+                            
+                            if (rg_ratio > 1.2) {
+                                return 3000; // 暖色调
+                            } else if (gb_ratio < 0.8) {
+                                return 7000; // 冷色调
+                            } else {
+                                return 5500; // 中性色调
+                            }
+                        },
+                        
+                        // 更新色温
+                        updateTemperature() {
+                            if (!this.enabled) return this.currentTemp;
+                            
+                            let targetTemp = 6500;
+                            
+                            // 时间基础色温
+                            if (this.timeBasedEnabled) {
+                                targetTemp = this.getTimeBasedTemperature();
+                            }
+                            
+                            // 环境基础色温调整
+                            if (this.environmentBasedEnabled) {
+                                const envTemp = this.getEnvironmentTemperature(
+                                    window.clockInstance.environmentMapping.parseColor(
+                                        window.clockInstance.environmentMapping.getBackgroundColor()
+                                    )
+                                );
+                                targetTemp = (targetTemp + envTemp) / 2; // 平均值
+                            }
+                            
+                            // 平滑过渡
+                            this.targetTemp = targetTemp;
+                            this.currentTemp += (this.targetTemp - this.currentTemp) * this.transitionSpeed;
+                            
+                            return this.currentTemp;
+                        }
+                    },
+                    
+                    // 智能动态亮度系统
+                    dynamicBrightness: {
+                        enabled: true,
+                        autoAdjustment: true,
+                        ambientSensitivity: 0.8,
+                        currentBrightness: 1.0,
+                        targetBrightness: 1.0,
+                        transitionSpeed: 0.03,
+                        
+                        // 时间基础亮度
+                        getTimeBasedBrightness() {
+                            const now = new Date();
+                            const hour = now.getHours();
+                            
+                            if (hour >= 6 && hour < 8) {
+                                return 0.6 + (hour - 6) * 0.15; // 日出：0.6-0.9
+                            } else if (hour >= 8 && hour < 18) {
+                                return 0.9 + Math.sin((hour - 8) * Math.PI / 10) * 0.1; // 白天：0.9-1.0
+                            } else if (hour >= 18 && hour < 22) {
+                                return 0.9 - (hour - 18) * 0.15; // 黄昏：0.9-0.3
+                            } else {
+                                return 0.3; // 夜间：0.3
+                            }
+                        },
+                        
+                        // 背景亮度分析
+                        getBackgroundBrightness(bgColor) {
+                            const brightness = (bgColor.r * 299 + bgColor.g * 587 + bgColor.b * 114) / 1000;
+                            return brightness / 255;
+                        },
+                        
+                        // 对比度计算
+                        calculateOptimalBrightness(bgBrightness) {
+                            // 确保足够对比度
+                            if (bgBrightness < 0.3) {
+                                return 1.0; // 深色背景用亮弧线
+                            } else if (bgBrightness > 0.7) {
+                                return 0.8; // 浅色背景用稍暗弧线
+                            } else {
+                                return 1.2 - bgBrightness; // 中等背景反向对比
+                            }
+                        },
+                        
+                        // 更新亮度
+                        updateBrightness() {
+                            if (!this.enabled) return this.currentBrightness;
+                            
+                            let targetBrightness = 1.0;
+                            
+                            if (this.autoAdjustment) {
+                                // 时间基础亮度
+                                const timeBrightness = this.getTimeBasedBrightness();
+                                
+                                // 环境亮度分析
+                                const bgColor = window.clockInstance.environmentMapping.parseColor(
+                                    window.clockInstance.environmentMapping.getBackgroundColor()
+                                );
+                                const bgBrightness = this.getBackgroundBrightness(bgColor);
+                                const contrastBrightness = this.calculateOptimalBrightness(bgBrightness);
+                                
+                                // 综合计算
+                                targetBrightness = (timeBrightness * 0.6 + contrastBrightness * 0.4) * this.ambientSensitivity;
+                                targetBrightness = Math.max(0.2, Math.min(1.2, targetBrightness)); // 限制范围
+                            }
+                            
+                            // 平滑过渡
+                            this.targetBrightness = targetBrightness;
+                            this.currentBrightness += (this.targetBrightness - this.currentBrightness) * this.transitionSpeed;
+                            
+                            return this.currentBrightness;
+                        }
+                    },
+                    
+                    // 获取背景色
+                    getBackgroundColor() {
+                        const body = document.body;
+                        const computedStyle = window.getComputedStyle(body);
+                        return computedStyle.background || computedStyle.backgroundColor;
+                    },
+                    
+                    // 解析RGB颜色
+                    parseColor(colorStr) {
+                        // 处理渐变背景，提取主要颜色
+                        if (colorStr.includes('linear-gradient')) {
+                            const matches = colorStr.match(/#[0-9a-fA-F]{6}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)/g);
+                            if (matches && matches.length > 0) {
+                                colorStr = matches[0]; // 使用第一个颜色
+                            }
+                        }
+                        
+                        let r, g, b;
+                        
+                        if (colorStr.startsWith('#')) {
+                            // 十六进制颜色
+                            const hex = colorStr.substring(1);
+                            r = parseInt(hex.substring(0, 2), 16);
+                            g = parseInt(hex.substring(2, 4), 16);
+                            b = parseInt(hex.substring(4, 6), 16);
+                        } else if (colorStr.startsWith('rgb')) {
+                            // RGB颜色
+                            const matches = colorStr.match(/\d+/g);
+                            if (matches && matches.length >= 3) {
+                                r = parseInt(matches[0]);
+                                g = parseInt(matches[1]);
+                                b = parseInt(matches[2]);
+                            }
+                        } else {
+                            // 默认颜色
+                            return { r: 42, g: 82, b: 152 }; // 默认蓝色
+                        }
+                        
+                        return { r: r || 0, g: g || 0, b: b || 0 };
+                    },
+                    
+                    // 计算颜色亮度
+                    calculateBrightness(rgb) {
+                        return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                    },
+                    
+                    // 计算色温
+                    calculateColorTemperature(rgb) {
+                        const r = rgb.r / 255;
+                        const g = rgb.g / 255;
+                        const b = rgb.b / 255;
+                        
+                        // 简化的色温计算
+                        if (b > g && b > r) return 'cool'; // 冷色调
+                        if (r > g && r > b) return 'warm'; // 暖色调
+                        return 'neutral'; // 中性色调
+                    },
+                    
+                    // 色温转换为RGB
+                    temperatureToRGB(kelvin) {
+                        const temp = kelvin / 100;
+                        let r, g, b;
+                        
+                        // 红色计算
+                        if (temp <= 66) {
+                            r = 255;
+                        } else {
+                            r = temp - 60;
+                            r = 329.698727446 * Math.pow(r, -0.1332047592);
+                            r = Math.max(0, Math.min(255, r));
+                        }
+                        
+                        // 绿色计算
+                        if (temp <= 66) {
+                            g = temp;
+                            g = 99.4708025861 * Math.log(g) - 161.1195681661;
+                        } else {
+                            g = temp - 60;
+                            g = 288.1221695283 * Math.pow(g, -0.0755148492);
+                        }
+                        g = Math.max(0, Math.min(255, g));
+                        
+                        // 蓝色计算
+                        if (temp >= 66) {
+                            b = 255;
+                        } else if (temp <= 19) {
+                            b = 0;
+                        } else {
+                            b = temp - 10;
+                            b = 138.5177312231 * Math.log(b) - 305.0447927307;
+                            b = Math.max(0, Math.min(255, b));
+                        }
+                        
+                        return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
+                    },
+                    
+                    // 应用色温调整到颜色
+                    applyTemperatureToColor(color, temperature) {
+                        const tempRGB = this.temperatureToRGB(temperature);
+                        const tempFactor = 0.3; // 色温影响强度
+                        
+                        return {
+                            r: Math.round(color.r * (1 - tempFactor) + tempRGB.r * tempFactor),
+                            g: Math.round(color.g * (1 - tempFactor) + tempRGB.g * tempFactor),
+                            b: Math.round(color.b * (1 - tempFactor) + tempRGB.b * tempFactor)
+                        };
+                    },
+                    
+                    // 应用亮度调整到颜色
+                    applyBrightnessToColor(color, brightness) {
+                        return {
+                            r: Math.round(Math.max(0, Math.min(255, color.r * brightness))),
+                            g: Math.round(Math.max(0, Math.min(255, color.g * brightness))),
+                            b: Math.round(Math.max(0, Math.min(255, color.b * brightness)))
+                        };
+                    },
+                    
+                    // 生成适配的弧线颜色（增强版）
+                    generateAdaptedColors(bgColor) {
+                        const brightness = this.calculateBrightness(bgColor);
+                        const temperature = this.calculateColorTemperature(bgColor);
+                        const isDark = brightness < 128;
+                        
+                        // 获取当前色温和亮度
+                        const currentTemp = this.colorTemperature.updateTemperature();
+                        const currentBrightness = this.dynamicBrightness.updateBrightness();
+                        
+                        let baseColors = {};
+                        
+                        if (isDark) {
+                            // 深色背景：使用亮色弧线
+                            switch(temperature) {
+                                case 'cool':
+                                    baseColors = {
+                                        primary: { r: 255, g: 255, b: 255 },
+                                        secondary: { r: 135, g: 206, b: 250 },
+                                        accent: { r: 173, g: 216, b: 230 }
+                                    };
+                                    break;
+                                case 'warm':
+                                    baseColors = {
+                                        primary: { r: 255, g: 248, b: 220 },
+                                        secondary: { r: 255, g: 215, b: 160 },
+                                        accent: { r: 255, g: 200, b: 120 }
+                                    };
+                                    break;
+                                default:
+                                    baseColors = {
+                                        primary: { r: 255, g: 255, b: 255 },
+                                        secondary: { r: 200, g: 225, b: 250 },
+                                        accent: { r: 173, g: 216, b: 230 }
+                                    };
+                            }
+                        } else {
+                            // 浅色背景：使用深色或对比色弧线
+                            switch(temperature) {
+                                case 'cool':
+                                    baseColors = {
+                                        primary: { r: 25, g: 118, b: 210 },
+                                        secondary: { r: 63, g: 81, b: 181 },
+                                        accent: { r: 92, g: 107, b: 192 }
+                                    };
+                                    break;
+                                case 'warm':
+                                    baseColors = {
+                                        primary: { r: 255, g: 87, b: 34 },
+                                        secondary: { r: 255, g: 152, b: 0 },
+                                        accent: { r: 255, g: 193, b: 7 }
+                                    };
+                                    break;
+                                default:
+                                    baseColors = {
+                                        primary: { r: 68, g: 138, b: 255 },
+                                        secondary: { r: 63, g: 81, b: 181 },
+                                        accent: { r: 92, g: 107, b: 192 }
+                                    };
+                            }
+                        }
+                        
+                        // 应用智能色温调整
+                        if (this.colorTemperature.enabled) {
+                            baseColors.primary = this.applyTemperatureToColor(baseColors.primary, currentTemp);
+                            baseColors.secondary = this.applyTemperatureToColor(baseColors.secondary, currentTemp);
+                            baseColors.accent = this.applyTemperatureToColor(baseColors.accent, currentTemp);
+                        }
+                        
+                        // 应用智能亮度调整
+                        if (this.dynamicBrightness.enabled) {
+                            baseColors.primary = this.applyBrightnessToColor(baseColors.primary, currentBrightness);
+                            baseColors.secondary = this.applyBrightnessToColor(baseColors.secondary, currentBrightness * 0.9);
+                            baseColors.accent = this.applyBrightnessToColor(baseColors.accent, currentBrightness * 0.8);
+                        }
+                        
+                        // 应用适配强度和对比度
+                        const intensity = this.adaptationIntensity;
+                        const contrast = this.contrastBoost * currentBrightness;
+                        
+                        return {
+                            stop1: this.rgbaString(baseColors.primary, 1.0 * contrast),
+                            stop2: this.rgbaString(baseColors.primary, 0.95 * contrast),
+                            stop3: this.rgbaString(baseColors.secondary, 0.85 * contrast),
+                            stop4: this.rgbaString(baseColors.secondary, 0.6 * contrast),
+                            stop5: this.rgbaString(baseColors.accent, 0.35 * contrast),
+                            stop6: this.rgbaString(baseColors.accent, 0.15 * contrast)
+                        };
+                    },
+                    
+                    // 生成RGBA字符串
+                    rgbaString(color, alpha) {
+                        return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+                    },
+                    
+                    // 应用颜色到弧线
+                    applyColorsToArc(colors) {
+                        const stops = document.querySelectorAll('#edgeGlow stop');
+                        
+                        if (stops.length >= 6) {
+                            gsap.to(stops[0], {
+                                attr: { 'stop-color': colors.stop1 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                            
+                            gsap.to(stops[1], {
+                                attr: { 'stop-color': colors.stop2 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                            
+                            gsap.to(stops[2], {
+                                attr: { 'stop-color': colors.stop3 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                            
+                            gsap.to(stops[3], {
+                                attr: { 'stop-color': colors.stop4 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                            
+                            gsap.to(stops[4], {
+                                attr: { 'stop-color': colors.stop5 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                            
+                            gsap.to(stops[5], {
+                                attr: { 'stop-color': colors.stop6 },
+                                duration: 2,
+                                ease: "power2.inOut"
+                            });
+                        }
+                        
+                        // 同时更新粒子颜色
+                        this.updateParticleColors(colors);
+                    },
+                    
+                    // 更新粒子颜色
+                    updateParticleColors(colors) {
+                        const particles = document.querySelectorAll('.trail-particle');
+                        particles.forEach(particle => {
+                            particle.style.background = `radial-gradient(circle, 
+                                ${colors.stop1.replace('1)', '0.6)')}, 
+                                ${colors.stop3.replace(/[\d.]+\)$/, '0.4)')}, 
+                                ${colors.stop5.replace(/[\d.]+\)$/, '0.2)')}, 
+                                transparent
+                            )`;
+                        });
+                    },
+                    
+                    // 更新映射
+                    updateMapping() {
+                        if (!this.isEnabled) return;
+                        
+                        const currentBg = this.getBackgroundColor();
+                        
+                        const bgColor = this.parseColor(currentBg);
+                        const adaptedColors = this.generateAdaptedColors(bgColor);
+                        
+                        // 背景变化时立即更新
+                        if (currentBg !== this.lastBackgroundColor) {
+                            this.lastBackgroundColor = currentBg;
+                            this.applyColorsToArc(adaptedColors);
+                            
+                            console.log('环境映射更新:', {
+                                background: currentBg,
+                                parsed: bgColor,
+                                brightness: this.calculateBrightness(bgColor),
+                                temperature: this.calculateColorTemperature(bgColor),
+                                currentTemp: this.colorTemperature.currentTemp,
+                                currentBrightness: this.dynamicBrightness.currentBrightness
+                            });
+                        } else {
+                            // 即使背景未变，也要检查时间相关的色温和亮度变化
+                            const tempChanged = Math.abs(this.colorTemperature.currentTemp - this.colorTemperature.targetTemp) > 50;
+                            const brightnessChanged = Math.abs(this.dynamicBrightness.currentBrightness - this.dynamicBrightness.targetBrightness) > 0.05;
+                            
+                            if (tempChanged || brightnessChanged) {
+                                this.applyColorsToArc(adaptedColors);
+                            }
+                        }
+                    }
+                };
+                
+                // 监听背景变化
+                const observer = new MutationObserver(() => {
+                    setTimeout(() => {
+                        this.environmentMapping.updateMapping();
+                    }, 100); // 延迟100ms确保样式已应用
+                });
+                
+                observer.observe(document.body, {
+                    attributes: true,
+                    attributeFilter: ['style', 'class'],
+                    childList: true,
+                    subtree: false
+                });
+                
+                // 初始化颜色映射
+                setTimeout(() => {
+                    this.environmentMapping.updateMapping();
+                }, 500);
+                
+                // 定时更新色温和亮度（每30秒检查一次）
+                setInterval(() => {
+                    if (this.environmentMapping.isEnabled) {
+                        this.environmentMapping.updateMapping();
+                    }
+                }, 30000);
+            }
+
+            // 发光弧线作为秒针 - 连续滑动（60秒一圈）+ 粒子尾迹
+            animateGlowArc() {
+                const svg = document.querySelector('.glow-arc');
+                const arc = svg?.querySelector('#edgeArc');
+                if (!svg || !arc) return;
+                
+                const tick = (currentTime) => {
+                    // 性能优化：FPS限制
+                    if (!this.performanceOptimization.shouldRender(currentTime || performance.now())) {
+                        requestAnimationFrame(tick);
+                        return;
+                    }
+                    
+                    const now = new Date();
+                    const seconds = now.getSeconds();
+                    const ms = now.getMilliseconds();
+                    
+                    // 精确计算：秒 + 毫秒，确保连续滑动
+                    const totalMs = seconds * 1000 + ms;
+                    const progress = totalMs / 60000; // 60秒的进度 (0-1)
+                    
+                    // 使用 dashoffset 控制弧线位置
+                    // pathLength=100，所以偏移范围是0-100
+                    // 0秒时弧线头部在12点，需要偏移75（从3点到12点是25%的路径）
+                    const offset = 75 - (progress * 100);
+                    
+                    // 设置弧线偏移
+                    arc.setAttribute('stroke-dashoffset', String(offset));
+                    
+                    // 粒子尾迹效果
+                    if (this.particleSystem && this.particleSystem.isEnabled) {
+                        // 计算弧线尾部位置（头部往后180度）
+                        const clockRect = document.querySelector('.circular-clock').getBoundingClientRect();
+                        const centerX = clockRect.width / 2;
+                        const centerY = clockRect.height / 2;
+                        const radius = clockRect.width * 0.48; // 与弧线半径相匹配
+                        
+                        const angle = progress * 2 * Math.PI - Math.PI / 2; // 从12点开始
+                        const tailAngle = angle - Math.PI; // 尾部位置（180度后）
+                        
+                        const tailX = centerX + Math.cos(tailAngle) * radius;
+                        const tailY = centerY + Math.sin(tailAngle) * radius;
+                        
+                        // 在尾部生成粒子（降低频率，更加淡雅）
+                        if (Math.random() < 0.15) { // 15%概率生成粒子
+                            const offsetDistance = Math.random() * 8; // 偏移距离
+                            const offsetAngle = (Math.random() - 0.5) * Math.PI / 4; // ±22.5度
+                            
+                            const particleX = tailX + Math.cos(tailAngle + offsetAngle) * offsetDistance;
+                            const particleY = tailY + Math.sin(tailAngle + offsetAngle) * offsetDistance;
+                            
+                            // 随机选择粒子大小，偏向小粒子
+                            const sizes = ['large', 'medium', 'small'];
+                            const weights = [0.05, 0.25, 0.7]; // 主要是小粒子
+                            let sizeIndex = 2; // 默认小粒子
+                            const rand = Math.random();
+                            let cumWeight = 0;
+                            for (let i = 0; i < weights.length; i++) {
+                                cumWeight += weights[i];
+                                if (rand <= cumWeight) {
+                                    sizeIndex = i;
+                                    break;
+                                }
+                            }
+                            
+                            const particle = this.particleSystem.createParticle(particleX, particleY, sizes[sizeIndex]);
+                            if (particle) {
+                                // 给粒子一个轻微的离心速度
+                                const centrifugalSpeed = 0.4;
+                                particle.vx = -Math.cos(tailAngle) * centrifugalSpeed + (Math.random() - 0.5) * 0.2;
+                                particle.vy = -Math.sin(tailAngle) * centrifugalSpeed + (Math.random() - 0.5) * 0.2;
+                            }
+                        }
+                        
+                        // 更新粒子
+                        this.particleSystem.updateParticles();
+                    }
+                    
+                    // 继续动画循环（FPS已在shouldRender中控制）
+                    requestAnimationFrame(tick);
+                };
+                
+                // 启动优化后的动画循环
+                requestAnimationFrame(tick);
+            }
+
+            // 更新数字时间
+            updateDigitalTime(now) {
+                const timeDisplay = document.querySelector('.time-display');
+                const dateDisplay = document.querySelector('.date-display');
+                
+                let hours = now.getHours();
+                let ampm = '';
+                
+                // 处理12小时制
+                if (!window.is24HourFormat) {
+                    ampm = hours >= 12 ? ' PM' : ' AM';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12; // 0点显示为12点
+                }
+                
+                const hoursStr = String(hours).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                timeDisplay.textContent = `${hoursStr}:${minutes}:${seconds}${ampm}`;
+                
+                const year = now.getFullYear();
+                const month = now.getMonth() + 1;
+                const date = now.getDate();
+                const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const weekday = weekdays[now.getDay()];
+                
+                dateDisplay.textContent = `${year}年${month}月${date}日 ${weekday}`;
+            }
+
+            // 更新时钟指针
+            updateClockHands(now) {
+                const hours = now.getHours() % 12;
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                
+                // 指针默认指向12点，直接计算角度即可
+                // 12点=0度, 3点=90度, 6点=180度, 9点=270度
+                const hourAngle = (hours * 30) + (minutes * 0.5);
+                const minuteAngle = minutes * 6;
+                
+                // 时钟指针精确指向当前时间
+                
+                // 处理秒针的平滑旋转，避免360度跳跃
+                // 秒针相关逻辑已移除
+                // if (this.lastSecond !== seconds) {
+                //     ... 秒针旋转计算逻辑 ...
+                // }
+                
+                gsap.to('.hour-hand', {
+                    rotation: hourAngle,
+                    duration: 0.5,
+                    ease: "power2.out"
+                });
+                
+                gsap.to('.minute-hand', {
+                    rotation: minuteAngle,
+                    duration: 0.5,
+                    ease: "power2.out"
+                });
+            }
+
+            // 获取天气数据
+            async getWeatherData() {
+                try {
+                    // 模拟天气数据（实际应用中应该从API获取）
+                    const weatherData = await this.fetchWeatherData();
+                    this.updateWeatherDisplay(weatherData);
+                } catch (error) {
+                    console.error('获取天气数据失败:', error);
+                    this.updateWeatherDisplay(this.getDefaultWeatherData());
+                }
+            }
+
+            // 模拟获取天气数据
+            fetchWeatherData() {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        const weatherTypes = [
+                            { icon: '☀️', desc: '晴朗' },
+                            { icon: '⛅', desc: '多云' },
+                            { icon: '☁️', desc: '阴天' },
+                            { icon: '🌧️', desc: '小雨' },
+                            { icon: '❄️', desc: '雪' }
+                        ];
+                        
+                        const randomWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+                        
+                        resolve({
+                            temperature: Math.floor(Math.random() * 30) + 5,
+                            icon: randomWeather.icon,
+                            description: randomWeather.desc,
+                            humidity: Math.floor(Math.random() * 40) + 40,
+                            windSpeed: Math.floor(Math.random() * 15) + 5,
+                            visibility: Math.floor(Math.random() * 20) + 10,
+                            pressure: Math.floor(Math.random() * 50) + 1000
+                        });
+                    }, 1500);
+                });
+            }
+
+            // 获取默认天气数据
+            getDefaultWeatherData() {
+                return {
+                    temperature: 22,
+                    icon: '☀️',
+                    description: '晴朗',
+                    humidity: 65,
+                    windSpeed: 8,
+                    visibility: 15,
+                    pressure: 1013
+                };
+            }
+
+            // 更新天气显示
+            updateWeatherDisplay(data) {
+                const weatherIcon = document.querySelector('.weather-icon');
+                const temperature = document.querySelector('.temperature');
+                const weatherDesc = document.querySelector('.weather-desc');
+                const weatherItems = document.querySelectorAll('.weather-item-value');
+                
+                weatherIcon.textContent = data.icon;
+                temperature.textContent = `${data.temperature}°`;
+                weatherDesc.textContent = data.description;
+                
+                weatherItems[0].textContent = `${data.humidity}%`;
+                weatherItems[1].textContent = `${data.windSpeed} km/h`;
+                weatherItems[2].textContent = `${data.visibility} km`;
+                weatherItems[3].textContent = `${data.pressure} hPa`;
+
+                // 天气图标动画
+                gsap.from(weatherIcon, {
+                    scale: 0,
+                    rotation: 180,
+                    duration: 1,
+                    ease: "elastic.out(1, 0.3)"
+                });
+            }
+
+            // 初始化动画
+            initAnimations() {
+                // 入场动画
+                const tl = gsap.timeline();
+                
+                tl.to('.loading', {
+                    opacity: 1,
+                    scale: 1,
+                    duration: 1,
+                    ease: "elastic.out(1, 0.3)",
+                    stagger: 0.2
+                });
+
+                // 背景渐变动画
+                gsap.to('body', {
+                    background: 'linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)',
+                    duration: 10,
+                    ease: "power2.inOut",
+                    yoyo: true,
+                    repeat: -1
+                });
+
+                // 秒针动画效果已移除
+                // gsap.to('.second-hand', {
+                //     filter: 'brightness(1.3)',
+                //     duration: 2,
+                //     ease: "power2.inOut",
+                //     yoyo: true,
+                //     repeat: -1
+                // });
+
+                // gsap.to('.second-hand', {
+                //     boxShadow: `...`,
+                //     duration: 1.5,
+                //     ease: "power2.inOut",
+                //     yoyo: true,
+                //     repeat: -1
+                // });
+            }
+
+            // 绑定事件
+            bindEvents() {
+                // 检测夜间模式 - 静默切换，不显示提示
+                const updateTimeMode = () => {
+                    const hour = new Date().getHours();
+                    const shouldBeNight = hour >= 22 || hour <= 6;
+                    
+                    if (shouldBeNight !== this.isNightMode) {
+                        this.isNightMode = shouldBeNight;
+                        document.body.classList.toggle('night-mode', this.isNightMode);
+                        // 移除了自动提示信息，保持静默切换
+                    }
+                };
+
+                updateTimeMode();
+                setInterval(updateTimeMode, 60000); // 每分钟检查一次
+
+                // 键盘事件
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' || e.key === ' ') {
+                        this.showExitMessage();
+                    }
+                });
+
+                // 鼠标移动检测 - 改进版，避免误触发
+                let mouseTimer;
+                let mouseMovementStarted = false;
+                let lastMouseX = -1;
+                let lastMouseY = -1;
+                
+                document.addEventListener('mousemove', (e) => {
+                    // 检查是否真的有鼠标移动
+                    if (lastMouseX === -1 && lastMouseY === -1) {
+                        lastMouseX = e.clientX;
+                        lastMouseY = e.clientY;
+                        return; // 初始位置，不处理
+                    }
+                    
+                    // 检查移动距离，避免微小抖动
+                    const deltaX = Math.abs(e.clientX - lastMouseX);
+                    const deltaY = Math.abs(e.clientY - lastMouseY);
+                    
+                    if (deltaX > 5 || deltaY > 5) { // 只有移动超过5px才认为是真正的移动
+                        lastMouseX = e.clientX;
+                        lastMouseY = e.clientY;
+                        
+                        if (!mouseMovementStarted) {
+                            mouseMovementStarted = true;
+                        }
+                        
+                        // 清除之前的计时器
+                        clearTimeout(mouseTimer);
+                        
+                        // 设置新的计时器
+                        mouseTimer = setTimeout(() => {
+                            if (mouseMovementStarted) {
+                                this.showExitMessage();
+                                mouseMovementStarted = false;
+                            }
+                        }, 5000);
+                    }
+                });
+
+                // 全屏模式
+                document.addEventListener('dblclick', () => {
+                    if (!document.fullscreenElement) {
+                        document.documentElement.requestFullscreen();
+                    } else {
+                        document.exitFullscreen();
+                    }
+                });
+
+                // 延迟绑定设置按钮事件，确保DOM完全加载
+                setTimeout(() => {
+                    const settingsBtn = document.getElementById('settingsBtn');
+                    console.log('查找设置按钮:', settingsBtn); // 调试日志
+                    
+                    if (settingsBtn) {
+                        console.log('设置按钮找到，绑定事件');
+                        
+                        // 主要点击事件
+                        settingsBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            console.log('设置按钮被点击'); // 调试日志
+                            
+                            // 确保toggleSettings函数可用
+                            if (typeof window.toggleSettings === 'function') {
+                                window.toggleSettings();
+                            } else {
+                                console.error('toggleSettings 函数不可用');
+                            }
+                        });
+                        
+                        // 添加触摸事件支持（移动设备）
+                        settingsBtn.addEventListener('touchstart', (e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            console.log('设置按钮被触摸');
+                            if (typeof window.toggleSettings === 'function') {
+                                window.toggleSettings();
+                            }
+                        });
+                        
+                        // 添加视觉反馈
+                        settingsBtn.addEventListener('mousedown', () => {
+                            settingsBtn.style.transform = 'scale(0.95)';
+                        });
+                        
+                        settingsBtn.addEventListener('mouseup', () => {
+                            settingsBtn.style.transform = 'scale(1)';
+                        });
+                        
+                        settingsBtn.addEventListener('mouseleave', () => {
+                            settingsBtn.style.transform = 'scale(1)';
+                        });
+                        
+                        // 测试点击区域
+                        settingsBtn.addEventListener('mouseover', () => {
+                            console.log('鼠标悬停在设置按钮上');
+                            settingsBtn.style.background = 'rgba(255, 255, 255, 0.25)';
+                        });
+                        
+                        settingsBtn.addEventListener('mouseout', () => {
+                            settingsBtn.style.background = 'rgba(255, 255, 255, 0.15)';
+                        });
+                        
+                    } else {
+                        console.error('设置按钮元素未找到，请检查HTML结构');
+                        
+                        // 尝试查找所有可能的设置按钮
+                        const allButtons = document.querySelectorAll('[id*="settings"], [class*="settings"]');
+                        console.log('找到的设置相关元素:', allButtons);
+                    }
+                }, 1000); // 延迟1秒确保所有元素都已加载
+            }
+
+            // 显示退出消息
+            showExitMessage() {
+                window.showMessage('🚪 屏保模式已退出\n按任意键继续使用', 3000);
+            }
+        }
+
+        // 立即定义设置功能，确保在页面加载时就可用
+        console.log('定义 toggleSettings 函数');
+        
+        // 设置功能 - 确保在全局作用域
+        window.toggleSettings = function() {
+            console.log('toggleSettings 函数被调用'); // 调试日志
+            
+            // 检查是否已存在设置面板
+            const existingSettings = document.querySelector('.settings-panel');
+            if (existingSettings) {
+                console.log('关闭现有设置面板');
+                existingSettings.remove();
+                return;
+            }
+            
+            console.log('创建新的设置面板');
+
+            const settings = document.createElement('div');
+            settings.className = 'settings-panel';
+            
+            // 响应式样式：桌面端和移动端自适应
+            const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                // 移动端：全屏模式
+                settings.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(42, 82, 152, 0.95);
+                    backdrop-filter: blur(20px);
+                    color: white;
+                    z-index: 10000;
+                    overflow-y: auto;
+                    padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px);
+                    display: flex;
+                    flex-direction: column;
+                    -webkit-overflow-scrolling: touch;
+                `;
+            } else {
+                // 桌面端：居中弹窗模式
+                settings.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(255, 255, 255, 0.05);
+                    backdrop-filter: blur(20px);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    border-radius: 20px;
+                    padding: 40px;
+                    color: white;
+                    z-index: 10000;
+                    text-align: center;
+                    min-width: 400px;
+                    max-width: 90vw;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                    box-shadow: 0 0 50px rgba(255, 255, 255, 0.1);
+                `;
+            }
+            settings.innerHTML = `
+                <div style="position: relative; width: 100%; height: 100%;">
+                    <!-- 移动端顶部关闭栏 -->
+                    <div style="
+                        display: ${isMobile ? 'flex' : 'none'};
+                        justify-content: space-between;
+                        align-items: center;
+                        padding: 15px 0;
+                        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                        margin-bottom: 20px;
+                    ">
+                        <h3 style="margin: 0; font-size: 1.3rem; color: #4ecdc4;">⚙️ 屏保设置</h3>
+                        <button onclick="this.closest('.settings-panel').remove()" style="
+                            background: rgba(255, 255, 255, 0.1);
+                            border: 1px solid rgba(255, 255, 255, 0.2);
+                            color: white;
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 18px;
+                        ">×</button>
+                    </div>
+                    
+                    <!-- 桌面端右上角关闭按钮 -->
+                    <button onclick="this.closest('.settings-panel').remove()" style="
+                        display: ${isMobile ? 'none' : 'flex'};
+                        position: absolute;
+                        top: -20px;
+                        right: -20px;
+                        background: rgba(255, 255, 255, 0.1);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        color: white;
+                        width: 30px;
+                        height: 30px;
+                        border-radius: 50%;
+                        cursor: pointer;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 16px;
+                        z-index: 1;
+                    ">×</button>
+                    
+                    <!-- 桌面端标题 -->
+                    <h3 style="
+                        display: ${isMobile ? 'none' : 'block'};
+                        margin-bottom: 30px; 
+                        font-size: 1.5rem;
+                        color: #4ecdc4;
+                    ">⚙️ 屏保设置</h3>
+                    
+                    <!-- 设置内容容器 -->
+                    <div style="
+                        display: grid; 
+                        grid-template-columns: 1fr; 
+                        gap: ${isMobile ? '15px' : '20px'}; 
+                        text-align: left;
+                        width: 100%;
+                        ${isMobile ? 'flex: 1; overflow-y: auto;' : ''}
+                    ">
+                        <!-- 时间设置 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px;">
+                            <h4 style="margin-bottom: 15px; color: #4ecdc4;">🕐 时间设置</h4>
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                                <button onclick="toggleTimeFormat()" class="setting-btn" id="timeFormatBtn">24小时制</button>
+                            </div>
+
+                        </div>
+                        
+                        <!-- 外观设置 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px;">
+                            <h4 style="margin-bottom: 15px; color: #ff6b6b;">🎨 外观设置</h4>
+                            <div style="display: grid; grid-template-columns: ${isMobile ? '1fr' : '1fr 1fr'}; gap: 10px;">
+                                <button onclick="toggleNightMode()" class="setting-btn" id="nightModeBtn">夜间模式</button>
+                                <button onclick="toggleParticles()" class="setting-btn" id="particlesBtn">背景粒子</button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px;">
+                                <button onclick="toggleEnvironmentMapping()" class="setting-btn" id="environmentMappingBtn">🌍 环境映射</button>
+                            </div>
+                            
+                            <!-- 智能调节系统 -->
+                            <div style="margin-top: 15px;">
+                                <h5 style="margin-bottom: 10px; color: #ff6b6b; font-size: 0.9rem;">🧠 智能调节</h5>
+                                <div style="display: grid; grid-template-columns: ${isMobile ? '1fr' : '1fr 1fr'}; gap: 8px;">
+                                    <button onclick="toggleColorTemperature()" class="setting-btn" id="colorTempBtn" style="font-size: 0.8rem;">🌡️ 智能色温</button>
+                                    <button onclick="toggleDynamicBrightness()" class="setting-btn" id="dynamicBrightnessBtn" style="font-size: 0.8rem;">💡 智能亮度</button>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 8px;">
+                                    <button onclick="toggleTimeBasedTemperature()" class="setting-btn" id="timeBasedTempBtn" style="font-size: 0.8rem;">⏰ 时间色温</button>
+                                </div>
+                            </div>
+                            
+                            <!-- 背景测试按钮 -->
+                            <div style="margin-top: 15px;">
+                                <h5 style="margin-bottom: 10px; color: #4ecdc4; font-size: 0.9rem;">🧪 背景测试</h5>
+                                <div style="display: grid; grid-template-columns: ${isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)'}; gap: 8px;">
+                                    <button onclick="testBackgroundColor('dark')" class="setting-btn" style="font-size: 0.8rem;">深色</button>
+                                    <button onclick="testBackgroundColor('light')" class="setting-btn" style="font-size: 0.8rem;">浅色</button>
+                                    <button onclick="testBackgroundColor('warm')" class="setting-btn" style="font-size: 0.8rem;">暖色</button>
+                                    <button onclick="testBackgroundColor('cool')" class="setting-btn" style="font-size: 0.8rem;">冷色</button>
+                                    <button onclick="testBackgroundColor('green')" class="setting-btn" style="font-size: 0.8rem;">绿色</button>
+                                    <button onclick="testBackgroundColor('default')" class="setting-btn" style="font-size: 0.8rem;">默认</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 天气设置 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px;">
+                            <h4 style="margin-bottom: 15px; color: #45b7d1;">🌤️ 天气设置</h4>
+                            <div style="display: grid; grid-template-columns: ${isMobile ? '1fr' : '1fr 1fr'}; gap: 10px;">
+                                <button onclick="refreshWeather()" class="setting-btn">刷新天气</button>
+                                <button onclick="changeCity()" class="setting-btn">更换城市</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 性能优化设置 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px;">
+                            <h4 style="margin-bottom: 15px; color: #ff9500;">⚡ 性能优化</h4>
+                            <div style="display: grid; grid-template-columns: ${isMobile ? '1fr' : '1fr 1fr'}; gap: 10px;">
+                                <button onclick="togglePerformanceDebug()" class="setting-btn" id="debugBtn">🐛 性能调试</button>
+                                <button onclick="adjustFPS(60)" class="setting-btn" style="font-size: 0.8rem;">60 FPS</button>
+                            </div>
+                            <div style="display: grid; grid-template-columns: ${isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)'}; gap: 8px; margin-top: 10px;">
+                                <button onclick="adjustFPS(30)" class="setting-btn" style="font-size: 0.8rem;">30 FPS</button>
+                                <button onclick="adjustFPS(20)" class="setting-btn" style="font-size: 0.8rem;">20 FPS</button>
+                                <button onclick="adjustFPS(15)" class="setting-btn" style="font-size: 0.8rem;">15 FPS</button>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.8rem; color: rgba(255,255,255,0.6);">
+                                默认: 30fps 平衡性能与流畅度
+                            </div>
+                        </div>
+                        
+                        <!-- 控制设置 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px;">
+                            <h4 style="margin-bottom: 15px; color: #f9ca24;">🎮 控制设置</h4>
+                            <div style="display: grid; grid-template-columns: ${isMobile ? '1fr' : '1fr 1fr'}; gap: 10px;">
+                                <button onclick="showHelp()" class="setting-btn">快捷键说明</button>
+                                <button onclick="showAbout()" class="setting-btn">关于屏保</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 退出选项 -->
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 15px; text-align: center;">
+                            <button onclick="exitScreensaver()" style="
+                                background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+                                border: none;
+                                color: white;
+                                padding: 12px 30px;
+                                border-radius: 25px;
+                                cursor: pointer;
+                                font-size: 16px;
+                                font-weight: bold;
+                                width: 100%;
+                            ">退出屏保模式</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // 添加设置按钮样式
+            const style = document.createElement('style');
+            style.textContent = `
+                .setting-btn {
+                    background: rgba(255, 255, 255, 0.1);
+                    border: 1px solid rgba(255, 255, 255, 0.2);
+                    color: white;
+                    padding: ${isMobile ? '15px 20px' : '10px 15px'};
+                    border-radius: 10px;
+                    cursor: pointer;
+                    font-size: ${isMobile ? '16px' : '14px'};
+                    transition: all 0.3s ease;
+                    min-height: ${isMobile ? '50px' : 'auto'};
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    text-align: center;
+                    white-space: nowrap;
+                    -webkit-tap-highlight-color: transparent;
+                }
+                .setting-btn:hover, .setting-btn:active {
+                    background: rgba(255, 255, 255, 0.2);
+                    transform: ${isMobile ? 'scale(0.95)' : 'translateY(-2px)'};
+                }
+                .setting-btn.active {
+                    background: rgba(78, 205, 196, 0.8);
+                }
+                
+                /* 移动端特殊适配 */
+                @media (max-width: 768px) {
+                    .settings-panel {
+                        padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px) !important;
+                    }
+                    
+                    .setting-btn {
+                        font-size: 16px !important;
+                        padding: 15px 20px !important;
+                        min-height: 50px !important;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            document.body.appendChild(settings);
+
+            gsap.from(settings, {
+                scale: 0,
+                opacity: 0,
+                duration: 0.4,
+                ease: "back.out(1.7)"
+            });
+        }
+
+        // 设置功能实现 - 确保在全局作用域
+        window.is24HourFormat = true;
+        window.showSecondHand = true;
+        window.particlesEnabled = true;
+        window.cosmicEffectEnabled = true;
+
+        window.toggleTimeFormat = function() {
+            window.is24HourFormat = !window.is24HourFormat;
+            const btn = document.getElementById('timeFormatBtn');
+            btn.textContent = window.is24HourFormat ? '24小时制' : '12小时制';
+            btn.classList.toggle('active', !window.is24HourFormat);
+        }
+
+        // 秒针切换功能已移除
+        // window.toggleSecondHand = function() { ... }
+
+        window.toggleNightMode = function() {
+            const body = document.body;
+            const btn = document.getElementById('nightModeBtn');
+            
+            body.classList.toggle('night-mode');
+            const isNight = body.classList.contains('night-mode');
+            
+            btn.textContent = isNight ? '日间模式' : '夜间模式';
+            btn.classList.toggle('active', isNight);
+        }
+
+        window.toggleParticles = function() {
+            window.particlesEnabled = !window.particlesEnabled;
+            const particles = document.querySelector('.background-particles');
+            const btn = document.getElementById('particlesBtn');
+            
+            if (window.particlesEnabled) {
+                particles.style.display = 'block';
+                btn.textContent = '背景粒子';
+                btn.classList.remove('active');
+            } else {
+                particles.style.display = 'none';
+                btn.textContent = '隐藏粒子';
+                btn.classList.add('active');
+            }
+        }
+
+        // 环境映射控制功能
+        window.toggleEnvironmentMapping = function() {
+            if (clockInstance && clockInstance.environmentMapping) {
+                clockInstance.environmentMapping.isEnabled = !clockInstance.environmentMapping.isEnabled;
+                const btn = document.getElementById('environmentMappingBtn');
+                
+                if (clockInstance.environmentMapping.isEnabled) {
+                    btn.textContent = '🌍 环境映射';
+                    btn.classList.remove('active');
+                    clockInstance.environmentMapping.updateMapping();
+                    window.showMessage('环境映射已启用', 2000, 'success');
+                } else {
+                    btn.textContent = '🌍 固定色彩';
+                    btn.classList.add('active');
+                    window.showMessage('环境映射已禁用', 2000, 'info');
+                }
+            }
+        }
+
+        // 测试不同背景色
+        window.testBackgroundColor = function(colorType) {
+            const body = document.body;
+            
+            switch(colorType) {
+                case 'dark':
+                    body.style.background = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%)';
+                    break;
+                case 'light':
+                    body.style.background = 'linear-gradient(135deg, #f5f5f5 0%, #e0e0e0 100%)';
+                    break;
+                case 'warm':
+                    body.style.background = 'linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #CD853F 100%)';
+                    break;
+                case 'cool':
+                    body.style.background = 'linear-gradient(135deg, #1e3c72 0%, #2a5298 50%, #4a7ba7 100%)';
+                    break;
+                case 'green':
+                    body.style.background = 'linear-gradient(135deg, #1a4a1a 0%, #2d5a2d 50%, #4a7a4a 100%)';
+                    break;
+                default:
+                    body.style.background = 'linear-gradient(135deg, #2a5298 0%, #1e3c72 100%)';
+            }
+            
+            window.showMessage(`背景切换为: ${colorType}`, 2000, 'info');
+        }
+
+        // 智能色温控制
+        window.toggleColorTemperature = function() {
+            if (clockInstance && clockInstance.environmentMapping && clockInstance.environmentMapping.colorTemperature) {
+                const temp = clockInstance.environmentMapping.colorTemperature;
+                temp.enabled = !temp.enabled;
+                const btn = document.getElementById('colorTempBtn');
+                
+                if (temp.enabled) {
+                    btn.textContent = '🌡️ 智能色温';
+                    btn.classList.remove('active');
+                    window.showMessage('智能色温已启用', 2000, 'success');
+                } else {
+                    btn.textContent = '🌡️ 固定色温';
+                    btn.classList.add('active');
+                    window.showMessage('智能色温已禁用', 2000, 'info');
+                }
+                
+                // 立即更新
+                clockInstance.environmentMapping.updateMapping();
+            }
+        }
+
+        // 智能亮度控制
+        window.toggleDynamicBrightness = function() {
+            if (clockInstance && clockInstance.environmentMapping && clockInstance.environmentMapping.dynamicBrightness) {
+                const brightness = clockInstance.environmentMapping.dynamicBrightness;
+                brightness.enabled = !brightness.enabled;
+                const btn = document.getElementById('dynamicBrightnessBtn');
+                
+                if (brightness.enabled) {
+                    btn.textContent = '💡 智能亮度';
+                    btn.classList.remove('active');
+                    window.showMessage('智能亮度已启用', 2000, 'success');
+                } else {
+                    btn.textContent = '💡 固定亮度';
+                    btn.classList.add('active');
+                    window.showMessage('智能亮度已禁用', 2000, 'info');
+                }
+                
+                // 立即更新
+                clockInstance.environmentMapping.updateMapping();
+            }
+        }
+
+        // 时间色温开关
+        window.toggleTimeBasedTemperature = function() {
+            if (clockInstance && clockInstance.environmentMapping && clockInstance.environmentMapping.colorTemperature) {
+                const temp = clockInstance.environmentMapping.colorTemperature;
+                temp.timeBasedEnabled = !temp.timeBasedEnabled;
+                const btn = document.getElementById('timeBasedTempBtn');
+                
+                if (temp.timeBasedEnabled) {
+                    btn.textContent = '⏰ 时间色温';
+                    btn.classList.remove('active');
+                    window.showMessage('时间色温已启用', 2000, 'success');
+                } else {
+                    btn.textContent = '⏰ 关闭时间色温';
+                    btn.classList.add('active');
+                    window.showMessage('时间色温已禁用', 2000, 'info');
+                }
+                
+                clockInstance.environmentMapping.updateMapping();
+            }
+        }
+
+        // 性能调试开关
+        window.togglePerformanceDebug = function() {
+            window.debugMode = !window.debugMode;
+            const btn = document.getElementById('debugBtn');
+            
+            if (window.debugMode) {
+                btn.textContent = '🐛 调试开启';
+                btn.classList.add('active');
+                window.showMessage('性能调试已启用 - 查看控制台FPS', 3000, 'info');
+                
+                // 显示当前FPS
+                if (clockInstance && clockInstance.performanceOptimization) {
+                    console.log(`当前FPS限制: ${clockInstance.performanceOptimization.targetFPS}`);
+                    console.log(`实际FPS: ${clockInstance.performanceOptimization.currentFPS}`);
+                }
+            } else {
+                btn.textContent = '🐛 性能调试';
+                btn.classList.remove('active');
+                window.showMessage('性能调试已禁用', 2000, 'info');
+            }
+        }
+
+        // 调整FPS限制
+        window.adjustFPS = function(fps) {
+            if (clockInstance && clockInstance.performanceOptimization) {
+                clockInstance.performanceOptimization.targetFPS = fps;
+                clockInstance.performanceOptimization.frameTime = 1000 / fps;
+                window.showMessage(`FPS限制已调整为: ${fps}`, 2000, 'success');
+                
+                if (window.debugMode) {
+                    console.log(`新的FPS限制: ${fps}fps (${clockInstance.performanceOptimization.frameTime.toFixed(2)}ms间隔)`);
+                }
+            }
+        }
+
+        window.refreshWeather = function() {
+            window.showMessage('🌤️ 正在刷新天气数据...', 2000);
+            // 重新获取天气数据
+            setTimeout(() => {
+                clockInstance.getWeatherData();
+                window.showMessage('✅ 天气数据已更新', 1500);
+            }, 1000);
+        }
+
+        window.changeCity = function() {
+            const newCity = prompt('请输入城市名称:', '北京市');
+            if (newCity) {
+                document.querySelector('.city-name').textContent = newCity;
+                window.showMessage(`📍 已切换到 ${newCity}`, 2000);
+            }
+        }
+
+        window.showHelp = function() {
+            const helpMsg = `
+                ⌨️ 快捷键说明：
+                
+                ESC / 空格键 - 退出屏保
+                双击屏幕 - 全屏/退出全屏
+                ⚙️ 按钮 - 打开设置面板
+                移动鼠标后静止5秒 - 提示退出
+                
+                💡 提示：屏保会自动检测夜间模式
+            `;
+            window.showMessage(helpMsg, 6000, 'help');
+        }
+
+        window.showAbout = function() {
+            const aboutMsg = `
+                📱 小米电视屏保模式
+                
+                版本: 2.0
+                基于: GSAP + CSS3
+                特色: 实时时钟 + 天气预报
+                设计: 简约风格
+            `;
+            window.showMessage(aboutMsg, 4000, 'about');
+        }
+
+        window.exitScreensaver = function() {
+            window.showMessage('👋 正在退出屏保模式...', 2000);
+            setTimeout(() => {
+                // 这里可以添加实际的退出逻辑
+                window.close() || history.back();
+            }, 1000);
+        }
+
+        // 优化的消息显示函数 - 全局作用域
+        window.showMessage = function(text, duration = 2000, type = 'info') {
+            const existingMessage = document.querySelector('.message-popup');
+            if (existingMessage) {
+                existingMessage.remove();
+            }
+
+            const message = document.createElement('div');
+            message.className = 'message-popup';
+            
+            // 根据消息类型设置不同的背景色和样式
+            let bgColor, borderColor, icon;
+            switch(type) {
+                case 'success':
+                    bgColor = 'rgba(76, 175, 80, 0.9)';
+                    borderColor = 'rgba(129, 199, 132, 0.6)';
+                    icon = '✅ ';
+                    break;
+                case 'error':
+                    bgColor = 'rgba(244, 67, 54, 0.9)';
+                    borderColor = 'rgba(239, 154, 154, 0.6)';
+                    icon = '❌ ';
+                    break;
+                case 'warning':
+                    bgColor = 'rgba(255, 152, 0, 0.9)';
+                    borderColor = 'rgba(255, 204, 128, 0.6)';
+                    icon = '⚠️ ';
+                    break;
+                case 'help':
+                    bgColor = 'rgba(78, 205, 196, 0.9)';
+                    borderColor = 'rgba(128, 222, 234, 0.6)';
+                    icon = '💡 ';
+                    break;
+                case 'about':
+                    bgColor = 'rgba(255, 107, 107, 0.9)';
+                    borderColor = 'rgba(255, 183, 77, 0.6)';
+                    icon = 'ℹ️ ';
+                    break;
+                default: // info
+                    bgColor = 'rgba(33, 150, 243, 0.9)';
+                    borderColor = 'rgba(144, 202, 249, 0.6)';
+                    icon = 'ℹ️ ';
+            }
+            
+            // 检测是否有设置面板打开
+            const settingsPanel = document.querySelector('.settings-panel');
+            const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            message.style.cssText = `
+                position: fixed;
+                top: ${isMobile ? '50px' : '20%'};
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${bgColor};
+                backdrop-filter: blur(15px);
+                border: 2px solid ${borderColor};
+                color: white;
+                padding: ${isMobile ? '25px 30px' : '20px 30px'};
+                border-radius: 15px;
+                font-size: ${isMobile ? '1.2rem' : '1.1rem'};
+                font-weight: 500;
+                z-index: 99999;
+                text-align: center;
+                white-space: pre-line;
+                max-width: ${isMobile ? '90vw' : '400px'};
+                box-shadow: 0 0 50px ${borderColor}, 0 10px 30px rgba(0, 0, 0, 0.3);
+                pointer-events: auto;
+                user-select: none;
+                animation: messageGlow 2s ease-in-out infinite alternate;
+            `;
+            
+            // 添加动画样式
+            if (!document.getElementById('message-styles')) {
+                const style = document.createElement('style');
+                style.id = 'message-styles';
+                style.textContent = `
+                    @keyframes messageGlow {
+                        0% { 
+                            box-shadow: 0 0 20px ${borderColor}, 0 10px 30px rgba(0, 0, 0, 0.3);
+                        }
+                        100% { 
+                            box-shadow: 0 0 40px ${borderColor}, 0 10px 30px rgba(0, 0, 0, 0.3);
+                        }
+                    }
+                    
+                    .message-popup {
+                        backdrop-filter: blur(20px) !important;
+                        -webkit-backdrop-filter: blur(20px) !important;
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            // 创建消息内容容器
+            const messageContent = document.createElement('div');
+            messageContent.style.cssText = `
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+            `;
+            
+            // 创建消息文本
+            const messageText = document.createElement('span');
+            messageText.textContent = icon + text;
+            messageText.style.cssText = `
+                flex: 1;
+                margin-right: ${text.includes('\n') ? '0' : '15px'};
+            `;
+            
+            // 创建关闭按钮
+            const closeBtn = document.createElement('button');
+            closeBtn.innerHTML = '×';
+            closeBtn.style.cssText = `
+                background: rgba(255, 255, 255, 0.2);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 16px;
+                font-weight: bold;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-left: 10px;
+                flex-shrink: 0;
+                transition: all 0.2s ease;
+                ${text.includes('\n') ? 'align-self: flex-start; margin-top: 5px;' : ''}
+            `;
+            
+            // 关闭按钮悬停效果
+            closeBtn.addEventListener('mouseenter', () => {
+                closeBtn.style.background = 'rgba(255, 255, 255, 0.4)';
+                closeBtn.style.transform = 'scale(1.1)';
+            });
+            
+            closeBtn.addEventListener('mouseleave', () => {
+                closeBtn.style.background = 'rgba(255, 255, 255, 0.2)';
+                closeBtn.style.transform = 'scale(1)';
+            });
+            
+            // 组装消息框
+            messageContent.appendChild(messageText);
+            if (type !== 'help' && type !== 'about') { // 简短消息显示关闭按钮
+                messageContent.appendChild(closeBtn);
+            }
+            message.appendChild(messageContent);
+            document.body.appendChild(message);
+
+            // 入场动画
+            gsap.from(message, {
+                scale: 0,
+                y: -50,
+                opacity: 0,
+                duration: 0.4,
+                ease: "back.out(1.7)"
+            });
+
+            // 添加手动关闭功能
+            const addCloseListeners = () => {
+                // 点击关闭按钮
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        hideMessage(message);
+                    });
+                }
+                
+                // 点击消息框关闭（仅对简短消息有效）
+                if (type !== 'help' && type !== 'about') {
+                    message.addEventListener('click', () => {
+                        hideMessage(message);
+                    });
+                }
+            };
+            
+            addCloseListeners();
+
+            // 定义隐藏函数
+            function hideMessage(msgElement) {
+                if (msgElement.style.opacity === '0') return; // 防止重复隐藏
+                
+                gsap.to(msgElement, {
+                    scale: 0,
+                    y: -30,
+                    opacity: 0,
+                    duration: 0.3,
+                    ease: "back.in(1.7)",
+                    onComplete: () => {
+                        if (msgElement.parentNode) {
+                            msgElement.remove();
+                        }
+                    }
+                });
+            }
+
+            // 自动隐藏定时器
+            const autoHideTimer = setTimeout(() => {
+                hideMessage(message);
+            }, duration);
+
+            // 鼠标悬停时暂停自动隐藏
+            message.addEventListener('mouseenter', () => {
+                clearTimeout(autoHideTimer);
+            });
+
+            // 鼠标离开时延迟隐藏
+            message.addEventListener('mouseleave', () => {
+                setTimeout(() => {
+                    hideMessage(message);
+                }, 1000);
+            });
+        }
+
+        // 全局变量存储时钟实例
+        let clockInstance;
+
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('页面开始加载');
+            clockInstance = new XiaomiTVClock();
+            
+            // 测试设置按钮的可用性
+            setTimeout(() => {
+                console.log('执行设置按钮测试');
+                const testBtn = document.getElementById('settingsBtn');
+                console.log('测试时设置按钮状态:', testBtn);
+                console.log('toggleSettings 函数状态:', typeof window.toggleSettings);
+                
+                if (testBtn) {
+                    console.log('设置按钮位置:', testBtn.getBoundingClientRect());
+                    console.log('设置按钮样式:', window.getComputedStyle(testBtn).pointerEvents);
+                }
+            }, 2000);
+        });
+    </script>
+</body>
+</html>
